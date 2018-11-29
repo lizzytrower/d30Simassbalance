@@ -31,7 +31,7 @@ icdfClay = icdf(pdfClay,z0);
 xfall = min(spicularcht(:,3)):tstep:max(PrChtall_sort(:,3));
 Chall = cat(1,spicularcht,silcarball_sort,PrChtall_sort);
 
-[fIFfit,fIFgof] = fit(IFabund(:,1),IFabund(:,2),'SmoothingSpline');
+[fIFfit,fIFgof] = fit(IFabund(:,1),IFabund(:,3),'SmoothingSpline');
 yfIF = fIFfit(xfall);
 yfIF(yfIF<0) = 0;
 
@@ -125,7 +125,7 @@ colorbar
 caxis([0 .1])
 
 fig1.Renderer = 'painters';
-saveas(gcf,'Troweretalmodelv2_fch','epsc')
+saveas(gcf,'Troweretalmodelv2hiArchean_fch','epsc')
 
 %%
 fig2 = figure;
@@ -153,7 +153,7 @@ colorbar
 caxis([0 .1])
 
 fig2.Renderer = 'painters';
-saveas(gcf,'Troweretalmodelv2_fclay','epsc')
+saveas(gcf,'Troweretalmodelv2hiArchean_fclay','epsc')
 
 %%
 tmat = trange.*ones(n,length(trange));
@@ -182,4 +182,4 @@ ylabel('f_I_F')
 colorbar
 
 fig3.Renderer = 'painters';
-saveas(gcf,'Troweretalmodelv2_fIF_lo','epsc')
+saveas(gcf,'Troweretalmodelv2hiArchean_fIF_lo','epsc')
