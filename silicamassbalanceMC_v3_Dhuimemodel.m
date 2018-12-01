@@ -10,8 +10,6 @@
 clear
 
 load('Precambriand30Sidata.mat');
-load('clayd30Sidata');
-Clay = clayd30Sidata;
 load('IFabund.mat');
 load('Tatzeletal2017data.mat');
 spicularcht = Tatzeletal2017spicularchert;

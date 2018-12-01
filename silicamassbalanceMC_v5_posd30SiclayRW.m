@@ -5,11 +5,16 @@
 
 %this version of the model includes iron formation (IF) as a silica sink
 %and applies f_clay based on the estimate of the reverse weathering
-%authigenic clay sink from Isson and Planavsky (2018).
+%authigenic clay sink from Isson and Planavsky (2018). Unlike previous
+%model versions, this model assumes that d30Si of clays formed via reverse
+%weathering is > d30Si_BSE and includes an additional, separate sink for
+%authigenic clays formed via regular silicate weathering.
 
 clear
 
 load('Precambriand30Sidata.mat');
+load('clayd30Sidata');
+Clay = clayd30Sidata;
 load('IFabund.mat');
 load('Tatzeletal2017data.mat');
 spicularcht = Tatzeletal2017spicularchert;
@@ -24,11 +29,19 @@ pdfBSE = makedist('Normal','mu',BSE,'sigma',BSE_1sd);
 z00 =rand(1,n);
 icdfBSE = icdf(pdfBSE,z00);
 
+pdfClay_sw = fitdist(Clay,'Kernel');
+z0 = rand(1,n);
+icdfClay_sw = icdf(pdfClay_sw,z0);
+
 xfall = min(spicularcht(:,3)):tstep:max(PrChtall_sort(:,3));
 Chall = cat(1,spicularcht,silcarball_sort,PrChtall_sort);
 
-fclay_isson = -0.0126.*xfall.^2 - 0.0234*xfall + 0.3552;
+fclay_isson = -.0126.*xfall.^2 - 0.0234*xfall + 0.3552;
 fclay_issonsims = abs(0.1*randn(n,length(xfall)) + fclay_isson);
+
+pdfClay_rw = makedist('Normal','mu',1,'sigma',1);
+zrw = rand(1,n);
+icdfClay_rw = icdf(pdfClay_rw,zrw);
 
 [fIFfit,fIFgof] = fit(IFabund(:,1),IFabund(:,2),'SmoothingSpline');
 yfIF = fIFfit(xfall);
@@ -56,31 +69,35 @@ dClaymat = zeros(n,length(trange));
 fChmat = zeros(n,length(trange));
 
 percs = 10:10:90;
-dClaypercs = zeros(length(percs),length(trange));
+fClaypercs = zeros(length(percs),length(trange));
 fChpercs = zeros(length(percs),length(trange));
-fBIFpercs = zeros(length(percs),length(trange));
+fIFpercs = zeros(length(percs),length(trange));
 
 %%
 for counter0 = 1:length(trange)
     
-    dClay = (icdfBSE' - fIFsims(:,counter0).*(IFsims(:,counter0) -...
-        Chsims(:,counter0)) - Chsims(:,counter0))./fclay_issonsims(:,counter0)...
-        + Chsims(:,counter0);
-    fCh = 1 - fclay_issonsims(:,counter0) - fIFsims(:,counter0);
+    fClay_sw = (Chsims(:,counter0).*(1 - fclay_issonsims(:,counter0) - ...
+        fIFsims(:,counter0)) + icdfClay_rw'.*fclay_issonsims(:,counter0) +...
+        fIFsims(:,counter0).*IFsims(:,counter0) - icdfBSE')./...
+        (Chsims(:,counter0) - icdfClay_rw');
+
+    fCh = 1 - fclay_issonsims(:,counter0) - fClay_sw - fIFsims(:,counter0);
 
     fCh(fCh < 0) = NaN;
     fCh(fCh > 1) = NaN;
-    dClay(fCh < 0) = NaN;
-    dClay(fCh > 1) = NaN;
+    fClay_sw(fClay_sw < 0) = NaN;
+    fClay_sw(fClay_sw > 1) = NaN;
+    fClay_sw(isnan(fCh) == 1) = NaN;
+    fCh(isnan(fClay_sw) == 1) = NaN;
 
     fChpercs(:,counter0) = prctile(fCh,percs);
-    fBIFpercs(:,counter0) = prctile(fIFsims(:,counter0),percs);
-    dClaypercs(:,counter0) = prctile(dClay,percs);
-    fClaymat(:,counter0) = fclay_issonsims(:,counter0);
-    dClaymat(:,counter0) = dClay;
+    fIFpercs(:,counter0) = prctile(fIFsims(:,counter0),percs);
+    fClaypercs(:,counter0) = prctile(fClay_sw,percs);
+    fClaymat(:,counter0) = fClay_sw;
     fChmat(:,counter0) = fCh;
-    
+          
 end
+
 %%
 %count how many NaN's are in each vector
 fChnans = sum(isnan(fChmat));
@@ -96,14 +113,14 @@ tmat = trange.*ones(n,length(trange));
 
 fig1 = figure;
 h1 = histogram2(tmat,fChmat,'DisplayStyle','tile');
-h1.XBinLimits = [.52 3.7];
+h1.XBinLimits = [.55 3.7];
 h1.NumBins = [32 21];
 fCh_histvals = h1.Values;
 normfactor1 = sum(fCh_histvals,2);
 fCh_histnorms = fCh_histvals./normfactor1;
 
-x_fch = 0.525:0.1:3.675;
-x_fch(1) = 0.52;
+x_fch = 0.575:0.1:3.675;
+x_fch(1) = 0.57;
 x_fch(end) = 3.7;
 
 y_fch = 0.:0.05:1;
@@ -122,12 +139,12 @@ colorbar
 caxis([0 .2])
 
 fig1.Renderer = 'painters';
-saveas(gcf,'Troweretalmodelv4_fclayIsson_fch','epsc')
+saveas(gcf,'Troweretalmodelv5_posd30SiclayRW_fch','epsc')
 
 %%
 fig2 = figure;
 h2 = histogram2(tmat,fClaymat,'DisplayStyle','tile');
-h2.XBinLimits = [.52 3.7];
+h2.XBinLimits = [.55 3.7];
 h2.NumBins = [32 21];
 fClay_histvals = h2.Values;
 normfactor2 = sum(fClay_histvals,2);
@@ -141,41 +158,13 @@ p2.EdgeColor = 'none';
 xlim([0 4])
 ylim([0 1])
 hold on
-% plot(trange,fClaypercs(5,:),'k','LineWidth',2)
-% plot(trange,fClaypercs(1,:),'k','LineWidth',0.25)
-% plot(trange,fClaypercs(9,:),'k','LineWidth',0.25)
+plot(trange,fClaypercs(5,:),'k','LineWidth',2)
+plot(trange,fClaypercs(1,:),'k','LineWidth',0.25)
+plot(trange,fClaypercs(9,:),'k','LineWidth',0.25)
 xlabel('age (Ga)')
-ylabel('f_c_l_a_y')
+ylabel('f_c_l_a_y_,_s_w')
 colorbar
 caxis([0 .2])
 
 fig2.Renderer = 'painters';
-saveas(gcf,'Troweretalmodelv4_fclayIsson_fclay','epsc')
-
-%%
-fig3 = figure;
-h3 = histogram2(tmat,dClaymat,'DisplayStyle','tile');
-h3.XBinLimits = [.52 3.7];
-h3.YBinLimits = [-10 6];
-h3.NumBins = [32 33];
-dClayhistvals = h3.Values;
-normfactor3 = sum(dClayhistvals,2);
-dClay_histnorms = dClayhistvals./normfactor3;
-
-y_dclay = -10:.5:6;
-
-p3 = pcolor(x_fclay,y_dclay,dClay_histnorms');
-p3.EdgeColor = 'none';
-xlim([0 4])
-ylim([-10 6])
-hold on
-plot(trange,dClaypercs(5,:),'k','LineWidth',2)
-plot(trange,dClaypercs(1,:),'k','LineWidth',0.25)
-plot(trange,dClaypercs(9,:),'k','LineWidth',0.25)
-xlabel('age (Ga)')
-ylabel('d^3^0Si_c_l_a_y')
-colorbar
-caxis([0 .12])
-
-fig3.Renderer = 'painters';
-saveas(gcf,'Troweretalmodelv4_fclayIsson_dclay','epsc')
+saveas(gcf,'Troweretalmodelv5_posd30SiclayRW_fclay','epsc')
